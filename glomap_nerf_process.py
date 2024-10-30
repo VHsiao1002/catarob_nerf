@@ -365,7 +365,7 @@ with TeeOutput(console_path):
             "--data", str(image_path),
             "--output-dir", str(base_path / 'processed'),
             "--skip-colmap",
-            "--colmap-model-path", str(sparse_path / '0'),
+            "--colmap-model-path", str('..' / sparse_path / '0'),
         ] +process_data_args
         ns_process_data_cmd = " ".join(ns_process_data_cmd)
         print(ns_process_data_cmd)
@@ -379,47 +379,47 @@ with TeeOutput(console_path):
     else:
         CONSOLE.log("[bold yellow]Skipping NeRFstudio process data.")
 
-    #================================================================================================================================================================
-    #NERFSTUDIO TRAIN
+#================================================================================================================================================================
+#NERFSTUDIO TRAIN
 
-    processed_path = base_path / "processed"
+processed_path = base_path / "processed"
 
-    if(not skip_train):
-        ns_train_cmd = ["ns-train", nerf_method]
-        if nerf_method == "depth-nerfacto":
-            ns_train_cmd.extend([
-                "colmap",
-                "--data", str(processed_path),
-                "--colmap-path", str(sparse_path / '0'),
-                "--load-3D-points", "True",
-                "--images-path", str(image_path),
-                "--depths-path", str(depth_path),
-                "--downscale", "factor", str(downscale_factor),
-                "--output-dir", str(processed_path),
-            ]) #+train_args
-        else:
-            ns_train_cmd.extend([
-                "--data", str(processed_path),
-                "--output-dir", str(processed_path),
-            ]) #+train_args   
-        if train_args:
-            ns_train_cmd.extend(train_args)
-        print(ns_train_cmd)
-            
-        #run ns-train command
-        start_time = time.time()
-        process = subprocess.Popen(ns_train_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        for line in process.stdout:
-            print(line, end="")
-        process.wait()
-        if process.returncode != 0:
-            error_output = process.stderr.read()
-            print(f"Error: {error_output}")
-        time_ns_train = time_taken(start_time)
-        CONSOLE.log(f"[bold green]:tada: Done {nerf_method} training. ({time_ns_train})","\n",
-                    f"[bold white]The config is saved at {base_path}/. Use ns-viewer --load-config path/to/config.yml to view the results ({processed_path}).")
+if(not skip_train):
+    ns_train_cmd = ["ns-train", nerf_method]
+    if nerf_method == "depth-nerfacto":
+        ns_train_cmd.extend([
+            "colmap",
+            "--data", str(processed_path),
+            "--colmap-path", str(sparse_path / '0'),
+            "--load-3D-points", "True",
+            "--images-path", str(image_path),
+            "--depths-path", str(depth_path),
+            "--downscale", "factor", str(downscale_factor),
+            "--output-dir", str(processed_path),
+        ]) #+train_args
     else:
-        CONSOLE.log("[bold yellow]Skipping NeRFstudio train.")
+        ns_train_cmd.extend([
+            "--data", str(processed_path),
+            "--output-dir", str(processed_path),
+        ]) #+train_args   
+    if train_args:
+        ns_train_cmd.extend(train_args)
+    print(ns_train_cmd)
+        
+    #run ns-train command
+    start_time = time.time()
+    process = subprocess.Popen(ns_train_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    for line in process.stdout:
+        print(line, end="")
+    process.wait()
+    if process.returncode != 0:
+        error_output = process.stderr.read()
+        print(f"Error: {error_output}")
+    time_ns_train = time_taken(start_time)
+    CONSOLE.log(f"[bold green]:tada: Done {nerf_method} training. ({time_ns_train})","\n",
+                f"[bold white]The config is saved at {base_path}/. Use ns-viewer --load-config path/to/config.yml to view the results ({processed_path}).")
+else:
+    CONSOLE.log("[bold yellow]Skipping NeRFstudio train.")
 
 
 #================================================================================================================================================================
