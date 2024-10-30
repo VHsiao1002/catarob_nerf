@@ -11,7 +11,8 @@
 
 #To use:
 #1. Have a project folder containing the images folder.
-#2. Run the script using the command: python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py | tee console.txt
+#2. cd into the project directory.
+#3. Run the script using the command: python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py | tee console.txt
 
 #IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
 
@@ -55,7 +56,8 @@ help_text = f"""
 
     To use:
     1. Have a project folder containing the images folder.
-    2. Run the script using the command: python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py | tee console.txt
+    2. cd into the project directory.
+    3. Run the script using the command: python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py | tee console.txt
 
     IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
 
