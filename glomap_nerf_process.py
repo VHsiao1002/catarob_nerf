@@ -147,6 +147,7 @@ default_database_path = Path(f"{default_base_path / 'database.db'}")
 default_camera_model = "OPENCV"
 default_camera_params = '529.4046769303875,529.6521348953188,647.1984132364281,354.6428014457265,0.007903972094598234,-0.002969179169396172,6.960621857680132e-05,-0.0012077776793605057' #default camera parameters for the blackfly camera
 default_matching_method = "sequential"
+default_use_gpu = 1
 default_sparse_path = Path(f"{default_base_path / 'sparse'}")
 default_nerf_method = "nerfacto"
 default_depth_path = Path(f"{default_base_path / 'depth'}")
@@ -174,6 +175,7 @@ parser.add_argument("--database_path",dest="database_path",  type=Path, default=
 parser.add_argument("--camera_model",dest="camera_model",  type=str, default=default_camera_model, help=f"Camera model (PINHOLE | OPENCV | RADIAL | SIMPLE_RADIAL | FISHEYE | SIMPLE_RADIAL_FISHEYE | OPENCV_FISHEYE). \nDefault: {default_camera_model}.")
 parser.add_argument("--camera_params",dest="camera_params",  type=str, default=default_camera_params, help=f"Camera parameters (fx,fy,cx,cy,k1,k2,p1,p2). \nDefault: {default_camera_params}.")
 parser.add_argument("--matching_method",dest="matching_method",  type=str, default=default_matching_method, help=f"COLMAP feature matcher method (exhaustive | sequential | vocab_tree ). \nDefault: {default_matching_method}.")
+parser.add_argument("--use_gpu", dest="use_gpu", type=int, default=default_use_gpu, help=f"Use GPU for feature matching. \nDefault: {default_use_gpu}.")
 parser.add_argument("--sparse_path", dest="sparse_path", type=Path, default=Path(default_sparse_path), help=f"Path to the sparse folder. \nDefault: {default_sparse_path}.")
 parser.add_argument("--nerf_method", dest="nerf_method", type=str, default=default_nerf_method, help=f"NeRF method to train (nerfacto | depth-nerfacto | instant-ngp | splatfacto). \nDefault: {default_nerf_method}.")
 parser.add_argument("--depth_path", dest="depth_path", type=Path, default=Path(default_depth_path), help=f"Path to the depth images. \nDefault: {default_depth_path}.")
@@ -199,6 +201,7 @@ database_path = Path(args.database_path) if args.database_path != default_databa
 camera_model = args.camera_model
 camera_params = args.camera_params
 matching_method = args.matching_method
+use_gpu = args.use_gpu
 sparse_path = Path(args.sparse_path) if args.sparse_path != default_sparse_path else Path(f"{base_path / 'sparse'}")
 nerf_method = args.nerf_method
 depth_path = Path(args.depth_path) if args.depth_path != default_depth_path else Path(f"{base_path / 'depth'}")
@@ -224,162 +227,164 @@ console_folder.mkdir(parents=True, exist_ok=True)
 console_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_console.txt"
 console_path = console_folder / console_filename
 
-with TeeOutput(console_path):
+#uncomment TeeOutput and tab in the script till process_data to save console output to a file
+# with TeeOutput(console_path):
     #================================================================================================================================================================
     #START OF SCRIPT:
     #================================================================================================================================================================
     #CHECKS:
 
-    CONSOLE.log("[bold white]Checking dependencies...")
+CONSOLE.log("[bold white]Checking dependencies...")
 
-    #check if colmap is installed
-    with status(msg="[bold yellow]Checking COLMAP installation...", spinner="moon"):
-        try:
-            run_command(f"{colmap_cmd} help", verbose=False)
-        except FileNotFoundError:
-            raise FileNotFoundError("COLMAP is not installed. Please install it from https://colmap.github.io/.")
-        CONSOLE.log("[bold green]COLMAP is already installed.")
+#check if colmap is installed
+with status(msg="[bold yellow]Checking COLMAP installation...", spinner="moon"):
+    try:
+        run_command(f"{colmap_cmd} help", verbose=False)
+    except FileNotFoundError:
+        raise FileNotFoundError("COLMAP is not installed. Please install it from https://colmap.github.io/.")
+    CONSOLE.log("[bold green]COLMAP is already installed.")
 
-    #check if glomap is installed
-    with status(msg="[bold yellow]Checking GLOMAP installation...", spinner="moon"):
-        try:
-            run_command(f"{glomap_cmd} --help", verbose=False)
-        except FileNotFoundError:
-            raise FileNotFoundError("GLOMAP is not installed. Please install it from ...") #todo
-        CONSOLE.log("[bold green]Glomap is already installed.")
+#check if glomap is installed
+with status(msg="[bold yellow]Checking GLOMAP installation...", spinner="moon"):
+    try:
+        run_command(f"{glomap_cmd} --help", verbose=False)
+    except FileNotFoundError:
+        raise FileNotFoundError("GLOMAP is not installed. Please install it from ...") #todo
+    CONSOLE.log("[bold green]Glomap is already installed.")
 
-    #check if nerfstudio is installed
-    with status(msg="[bold yellow]Checking NeRFstudio installation...", spinner="moon"):
-        try:
-            import nerfstudio
-        except ImportError:
-            raise ImportError("NeRFstudio is not installed. Please install it from ...") #todo
-        CONSOLE.log("[bold green]NeRFstudio is already installed.")
-        
-    #check if database exists and state it exists else create it at the specified path using the command: sqlite3 database.db "VACUUM;" 
-    if not database_path.exists():
-        with status(msg="[bold yellow]database.db does not exist. Creating database...", spinner="moon"):
-            run_command(f"sqlite3 {database_path} 'VACUUM;'", verbose=False)
-        CONSOLE.log(f"[bold green]:tada: Database created at {database_path}.")
-    else:
-        CONSOLE.log(f"[bold green]Database exists.")
-        
-    #check if image_path exists and state number of images that are .jpg or .png
-    if not image_path.exists():
-        raise FileNotFoundError(f"Image path {image_path} does not exist.")
-    else:
-        image_files = list(image_path.glob("*.jpg")) + list(image_path.glob("*.png"))
-        if not image_files:
-            raise FileNotFoundError(f"No images found in {image_path}.")
-        CONSOLE.log(f"[bold green]:tada: Found {len(image_files)} images in {image_path}.")
-        
+#check if nerfstudio is installed
+with status(msg="[bold yellow]Checking NeRFstudio installation...", spinner="moon"):
+    try:
+        import nerfstudio
+    except ImportError:
+        raise ImportError("NeRFstudio is not installed. Please install it from ...") #todo
+    CONSOLE.log("[bold green]NeRFstudio is already installed.")
+    
+#check if database exists and state it exists else create it at the specified path using the command: sqlite3 database.db "VACUUM;" 
+if not database_path.exists():
+    with status(msg="[bold yellow]database.db does not exist. Creating database...", spinner="moon"):
+        run_command(f"sqlite3 {database_path} 'VACUUM;'", verbose=False)
+    CONSOLE.log(f"[bold green]:tada: Database created at {database_path}.")
+else:
+    CONSOLE.log(f"[bold green]Database exists.")
+    
+#check if image_path exists and state number of images that are .jpg or .png
+if not image_path.exists():
+    raise FileNotFoundError(f"Image path {image_path} does not exist.")
+else:
+    image_files = list(image_path.glob("*.jpg")) + list(image_path.glob("*.png"))
+    if not image_files:
+        raise FileNotFoundError(f"No images found in {image_path}.")
+    CONSOLE.log(f"[bold green]:tada: Found {len(image_files)} images in {image_path}.")
+    
 
-    # CONSOLE.log(base_path)
-    # CONSOLE.log(image_path)
-    # CONSOLE.log(database_path)
+# CONSOLE.log(base_path)
+# CONSOLE.log(image_path)
+# CONSOLE.log(database_path)
 
 
-    CONSOLE.log("[bold green]\n:tada: All dependencies exist.\n",
-                "[bold white]Starting GLOMAP Processing...")
-        
-    #================================================================================================================================================================
-    #FEATURE EXTRACTOR
+CONSOLE.log("[bold green]\n:tada: All dependencies exist.\n",
+            "[bold white]Starting GLOMAP Processing...")
+    
+#================================================================================================================================================================
+#FEATURE EXTRACTOR
 
-    if not skip_extractor:
-        feature_extractor_cmd = [
-                str(colmap_cmd), "feature_extractor",
-                "--database_path", str(database_path),
-                "--image_path", str(image_path),
-                "--ImageReader.single_camera", "1",
-                "--ImageReader.camera_model", str(camera_model),
-                "--ImageReader.camera_params", str(camera_params),
-            ]  +extractor_args 
-        feature_extractor_cmd = " ".join(feature_extractor_cmd)
-        print(feature_extractor_cmd)
-
-        #run feature extractor command 
-        start_time = time.time()
-        with status(msg="[bold yellow]Running COLMAP feature extractor...", spinner="runner"):
-            run_command(feature_extractor_cmd, verbose=verbose)
-        time_feature_extractor = time_taken(start_time)
-        CONSOLE.log(f"[bold green]:tada: Done extracting COLMAP features. ({time_feature_extractor})")
-    else:
-        CONSOLE.log("[bold yellow]Skipping feature extractor.")
-
-    #================================================================================================================================================================
-    #FEATURE MATCHER
-
-    if not skip_matcher:
-        feature_matcher_cmd = [
-                str(colmap_cmd), f"{matching_method}_matcher",
-                "--database_path", str(database_path),
-            ] +matcher_args
-        if matching_method == "vocab_tree":
-            vocab_tree_filename = get_vocab_tree()  
-            feature_matcher_cmd.append(f'--VocabTreeMatching.vocab_tree_path "{vocab_tree_filename}"')
-        feature_matcher_cmd = " ".join(feature_matcher_cmd)
-        print(feature_matcher_cmd)
-
-        #run feature matcher command
-        start_time = time.time()
-        with status(msg="[bold yellow]Running COLMAP feature matcher...", spinner="runner", verbose=verbose):
-            run_command(feature_matcher_cmd, verbose=verbose)
-        time_feature_matcher = time_taken(start_time)
-        CONSOLE.log(f"[bold green]:tada: Done matching COLMAP features. ({time_feature_matcher})")
-    else:
-        CONSOLE.log("[bold yellow]Skipping feature matcher.")
-
-    #================================================================================================================================================================
-    #GLOMAP MAPPER
-
-    sparse_path.mkdir(parents=True, exist_ok=True)
-
-    if not skip_mapper:
-        glomap_mapper_cmd = [
-            str(glomap_cmd), "mapper",
+if not skip_extractor:
+    feature_extractor_cmd = [
+            str(colmap_cmd), "feature_extractor",
             "--database_path", str(database_path),
             "--image_path", str(image_path),
-            "--output_path", str(sparse_path),
-        ] +mapper_args
-        glomap_mapper_cmd = " ".join(glomap_mapper_cmd)
-        print(glomap_mapper_cmd)
+            "--ImageReader.single_camera", "1",
+            "--ImageReader.camera_model", str(camera_model),
+            "--ImageReader.camera_params", str(camera_params),
+        ]  +extractor_args 
+    feature_extractor_cmd = " ".join(feature_extractor_cmd)
+    print(feature_extractor_cmd)
 
-        #run glomap mapper command
-        start_time = time.time()
-        with status(msg="[bold yellow]Running GLOMAP mapper... (This may take a while)", spinner="runner", verbose=verbose):
-            run_command(glomap_mapper_cmd, verbose=verbose)
-        time_glomap_mapper = time_taken(start_time)
-        CONSOLE.log(f"[bold green]:tada: Done mapping images with GLOMAP. ({time_glomap_mapper})","\n",
-                    "[bold white]View the glomap sparse model using:","\n",f"colmap gui --image_path {image_path} --database_path {database_path} --import_path {sparse_path / '0'}")
-    else:
-        CONSOLE.log("[bold yellow]Skipping glomap mapper.")
+    #run feature extractor command 
+    start_time = time.time()
+    with status(msg="[bold yellow]Running COLMAP feature extractor...", spinner="runner"):
+        run_command(feature_extractor_cmd, verbose=verbose)
+    time_feature_extractor = time_taken(start_time)
+    CONSOLE.log(f"[bold green]:tada: Done extracting COLMAP features. ({time_feature_extractor})")
+else:
+    CONSOLE.log("[bold yellow]Skipping feature extractor.")
 
-    #================================================================================================================================================================
-    CONSOLE.log("[bold green]\n:tada: GLOMAP Processing complete.\n",
-                "[bold white]Starting NeRFstudio data processing...")
+#================================================================================================================================================================
+#FEATURE MATCHER
 
-    #================================================================================================================================================================
-    #NERFSTUDIO PROCESS DATA
+if not skip_matcher:
+    feature_matcher_cmd = [
+            str(colmap_cmd), f"{matching_method}_matcher",
+            "--database_path", str(database_path),
+            "--SiftMatching.use_gpu", str(use_gpu),
+        ] +matcher_args
+    if matching_method == "vocab_tree":
+        vocab_tree_filename = get_vocab_tree()  
+        feature_matcher_cmd.append(f'--VocabTreeMatching.vocab_tree_path "{vocab_tree_filename}"')
+    feature_matcher_cmd = " ".join(feature_matcher_cmd)
+    print(feature_matcher_cmd)
 
-    if not skip_process_data:
-        ns_process_data_cmd = [
-            "ns-process-data images",
-            "--data", str(image_path),
-            "--output-dir", str(base_path / 'processed'),
-            "--skip-colmap",
-            "--colmap-model-path", str('..' / sparse_path / '0'),
-        ] +process_data_args
-        ns_process_data_cmd = " ".join(ns_process_data_cmd)
-        print(ns_process_data_cmd)
+    #run feature matcher command
+    start_time = time.time()
+    with status(msg="[bold yellow]Running COLMAP feature matcher...", spinner="runner", verbose=verbose):
+        run_command(feature_matcher_cmd, verbose=verbose)
+    time_feature_matcher = time_taken(start_time)
+    CONSOLE.log(f"[bold green]:tada: Done matching COLMAP features. ({time_feature_matcher})")
+else:
+    CONSOLE.log("[bold yellow]Skipping feature matcher.")
 
-        #run ns-process-data command
-        start_time = time.time()
-        with status(msg="[bold yellow]Running NeRFstudio process data...", spinner="runner", verbose=verbose):
-            run_command(ns_process_data_cmd, verbose=verbose)
-        time_ns_process_data = time_taken(start_time)
-        CONSOLE.log(f"[bold green]:tada: Done processing data for NeRFstudio. ({time_ns_process_data})")
-    else:
-        CONSOLE.log("[bold yellow]Skipping NeRFstudio process data.")
+#================================================================================================================================================================
+#GLOMAP MAPPER
+
+sparse_path.mkdir(parents=True, exist_ok=True)
+
+if not skip_mapper:
+    glomap_mapper_cmd = [
+        str(glomap_cmd), "mapper",
+        "--database_path", str(database_path),
+        "--image_path", str(image_path),
+        "--output_path", str(sparse_path),
+    ] +mapper_args
+    glomap_mapper_cmd = " ".join(glomap_mapper_cmd)
+    print(glomap_mapper_cmd)
+
+    #run glomap mapper command
+    start_time = time.time()
+    with status(msg="[bold yellow]Running GLOMAP mapper... (This may take a while)", spinner="runner", verbose=verbose):
+        run_command(glomap_mapper_cmd, verbose=verbose)
+    time_glomap_mapper = time_taken(start_time)
+    CONSOLE.log(f"[bold green]:tada: Done mapping images with GLOMAP. ({time_glomap_mapper})","\n",
+                "[bold white]View the glomap sparse model using:","\n",f"colmap gui --image_path {image_path} --database_path {database_path} --import_path {sparse_path / '0'}")
+else:
+    CONSOLE.log("[bold yellow]Skipping glomap mapper.")
+
+#================================================================================================================================================================
+CONSOLE.log("[bold green]\n:tada: GLOMAP Processing complete.\n",
+            "[bold white]Starting NeRFstudio data processing...")
+
+#================================================================================================================================================================
+#NERFSTUDIO PROCESS DATA
+
+if not skip_process_data:
+    ns_process_data_cmd = [
+        "ns-process-data images",
+        "--data", str(image_path),
+        "--output-dir", str(base_path / 'processed'),
+        "--skip-colmap",
+        "--colmap-model-path", str('..' / sparse_path / '0'),
+    ] +process_data_args
+    ns_process_data_cmd = " ".join(ns_process_data_cmd)
+    print(ns_process_data_cmd)
+
+    #run ns-process-data command
+    start_time = time.time()
+    with status(msg="[bold yellow]Running NeRFstudio process data...", spinner="runner", verbose=verbose):
+        run_command(ns_process_data_cmd, verbose=verbose)
+    time_ns_process_data = time_taken(start_time)
+    CONSOLE.log(f"[bold green]:tada: Done processing data for NeRFstudio. ({time_ns_process_data})")
+else:
+    CONSOLE.log("[bold yellow]Skipping NeRFstudio process data.")
 
 #================================================================================================================================================================
 #NERFSTUDIO TRAIN
