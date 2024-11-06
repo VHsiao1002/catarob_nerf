@@ -29,11 +29,27 @@ import sys
 import os
 import re
 from datetime import datetime, timedelta
+# import textwrap
 
 #================================================================================================================================================================
 #CONSTANTS:
 
 help_text = """
+This script will take the input camera poses .json file and render the images using NeRFstudio.
+    
+The process flow of this script goes as follows:
+1. Check if NeRFstudio is installed and whether the config file exists. If the mode is camera-path, check if the camera path file exists.
+2. Run the ns-render command to render the images.
+    
+To use:
+1. cd to the project directory where the NeRF model has been trained.
+2. Run the script using the command: python PATH/TO/THIS/SCRIPT/camera_poses_to_images.py --config_path PATH/TO/CONFIG/FILE
+3. If '--mode camera_path', use --camera_path PATH/TO/CAMERA/PATH/FILE as well.
+
+IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
+
+Example usage:
+python PATH/TO/THIS/SCRIPT/camera_poses_to_images.py --config_path PATH/TO/CONFIG/FILE --camera_path PATH/TO/CAMERA/PATH/FILE | tee console.txt
 
 """
 
@@ -81,17 +97,17 @@ default_base_path = Path("./")
 default_mode = "camera-path"
 default_config_path = Path("./processed/processed/nerfacto/config.yml") #REQUIRED
 default_camera_path = Path("./processed/processed/nerfacto/camera_path.json")
-
-#at ./processed/processed/method/datetime/output
-default_output_path = Path(f'./renders/{default_mode}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}/output')
+default_output_name = "output"
+default_output_path = Path(f'./renders/{default_mode}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}/{default_output_name}')
 default_output_format = "images"
 default_interpolation_steps = 10
 default_frame_rate = 24
+default_occlusions = False
 default_extra_args = ""
 
 
 #parser
-parser = argparse.ArgumentParser(description=help_text)
+parser = argparse.ArgumentParser(description=help_text, formatter_class=argparse.RawTextHelpFormatter)
 
 
 #parser arguments
@@ -104,6 +120,7 @@ parser.add_argument("--output_path", dest="output_path", type=Path, default=defa
 parser.add_argument("--output_format", dest="output_format", type=str, default=default_output_format, help=f"Output format. \nDefault: {default_output_format}.")
 parser.add_argument("--interpolation_steps", dest="interpolation_steps", type=int, default=default_interpolation_steps, help=f"Number of interpolation steps. \nDefault: {default_interpolation_steps}.")
 parser.add_argument("--frame_rate", dest="frame_rate", type=int, default=default_frame_rate, help=f"Frame rate of the output video. \nDefault: {default_frame_rate}.")
+parser.add_argument("--occlusions", dest="occlusions", default=default_occlusions, help=f"Check occlusions. \nDefault: {default_occlusions}.", action="store_true")
 parser.add_argument("--extra_args", dest="extra_args", type=str, default=default_extra_args, help="Additional arguments for the ns-render command.")
 
 
@@ -114,10 +131,12 @@ base_path = Path(args.base_path)
 mode = args.mode
 config_path = Path(args.config_path)
 camera_path = Path(args.camera_path)
-output_path = Path(args.output_path) if args.output_path != default_output_path else Path(f'./renders/{default_mode}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}/output')
+output_name = args.output_name
+output_path = Path(args.output_path) if args.output_path != default_output_path else Path(f'./renders/{default_mode}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}/{output_name}')
 output_format = args.output_format
 interpolation_steps = args.interpolation_steps
 frame_rate = args.frame_rate
+occlusions = args.occlusions
 extra_args = shlex.split(args.extra_args) if args.extra_args else []
 
 
@@ -125,17 +144,18 @@ extra_args = shlex.split(args.extra_args) if args.extra_args else []
 #MAIN SCRIPT:
 
 #console file name is current date and time
-console_folder = base_path / 'console'
-console_folder.mkdir(parents=True, exist_ok=True)
-console_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_console.txt"
-console_path = console_folder / console_filename
-
+# console_folder = base_path / 'console'
+# console_folder.mkdir(parents=True, exist_ok=True)
+# console_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_console.txt"
+# console_path = console_folder / console_filename
+#use '| tee console.txt' to save console output to a file
 #uncomment TeeOutput and tab in script to save console output to a file
 # with TeeOutput(console_path):
-    #================================================================================================================================================================
-    #START OF SCRIPT:
-    #================================================================================================================================================================
-    #CHECKS:
+
+#================================================================================================================================================================
+#START OF SCRIPT:
+#================================================================================================================================================================
+#CHECKS:
     
 CONSOLE.log("[bold white]Checking dependencies...")
 
@@ -175,6 +195,7 @@ if mode == "camera-path":
         "--camera-path-filename", str(camera_path),
         "--output-path", str(output_path),
         "--output-format", str(output_format),
+        "--check-occlusions", str(occlusions),
     ] +extra_args
 elif mode == "interpolate":
     render_cmd = [
@@ -184,18 +205,16 @@ elif mode == "interpolate":
         "--output-format", str(output_format),
         "--interpolation-steps", str(interpolation_steps),
         "--frame-rate", str(frame_rate),
+        "--check-occlusions", str(occlusions),
     ] +extra_args
 # elif mode == "dataset":
 #     render_cmd = [
 #         str(ns_cmd), str(mode),
-#         "--load-config", str(config_path),
-        
-        
-        
+#         "--load-config", str(config_path), 
 #     ] +extra_args
-    
-# render_cmd = " ".join(render_cmd)
-#run ns-render command    
+else:
+    raise ValueError(f"Invalid mode: {mode}")
+
 print(" ".join(render_cmd))
 start_time = time.time()
 process = subprocess.Popen(render_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

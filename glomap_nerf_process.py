@@ -43,27 +43,27 @@ from datetime import datetime, timedelta
 #CONSTANTS:
         
 help_text = f"""
-    This script will process the images using glomap and then process the data for NeRFstudio training.
+This script will process the images using glomap and then process the data for NeRFstudio training.
 
-    The process flow of this script goes as follows:
-    1. Check if the necessary dependencies exist (COLMAP, GLOMAP, NeRFstudio, database.db, images)
-    2. Run COLMAP feature extractor
-    3. Run COLMAP feature matcher
-    4. Run GLOMAP mapper
-    5. Run NeRFstudio process data
-    6. Run NeRFstudio train
+The process flow of this script goes as follows:
+1. Check if the necessary dependencies exist (COLMAP, GLOMAP, NeRFstudio, database.db, images)
+2. Run COLMAP feature extractor
+3. Run COLMAP feature matcher
+4. Run GLOMAP mapper
+5. Run NeRFstudio process data
+6. Run NeRFstudio train
 
+To use:
+1. Have a project folder containing the images folder.
+2. cd into the project directory.
+3. Run the script using the command: python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py | tee console.txt
 
-    To use:
-    1. Have a project folder containing the images folder.
-    2. cd into the project directory.
-    3. Run the script using the command: python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py | tee console.txt
+IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
 
-    IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
+Example usage:
+python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py --base_path /PATH/TO/PROJECT/DIRECTORY | tee console.txt
 
-    Example usage:
-    python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py --base_path /PATH/TO/PROJECT/DIRECTORY | tee console.txt
-    """
+"""
     
     
 colmap_cmd = "colmap"
@@ -222,17 +222,18 @@ train_args = shlex.split(args.train_args) if args.train_args else []
 #MAIN SCRIPT:
 
 #console file name is current date and time
-console_folder = base_path / 'console'
-console_folder.mkdir(parents=True, exist_ok=True)
-console_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_console.txt"
-console_path = console_folder / console_filename
-
-#uncomment TeeOutput and tab in the script till process_data to save console output to a file
+# console_folder = base_path / 'console'
+# console_folder.mkdir(parents=True, exist_ok=True)
+# console_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_console.txt"
+# console_path = console_folder / console_filename
+#use '| tee console.txt' to save console output to a file
+#uncomment TeeOutput and tab in the script till process_data to save console output to a file.
 # with TeeOutput(console_path):
-    #================================================================================================================================================================
-    #START OF SCRIPT:
-    #================================================================================================================================================================
-    #CHECKS:
+
+#================================================================================================================================================================
+#START OF SCRIPT:
+#================================================================================================================================================================
+#CHECKS:
 
 CONSOLE.log("[bold white]Checking dependencies...")
 
