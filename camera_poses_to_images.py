@@ -116,6 +116,7 @@ parser.add_argument("--base_path", dest="base_path", type=Path, default=Path(def
 parser.add_argument("--mode", dest="mode", type=str, default=default_mode, help=f"Mode of rendering. \nDefault: {default_mode}.")
 parser.add_argument("--config_path", dest="config_path", type=Path, default=default_config_path, help=f"Path to the config file. \n REQUIRED: NO DEFAULT.")
 parser.add_argument("--camera_path", dest="camera_path", type=Path, default=default_camera_path, help=f"Path to the camera path file. \nDefault: {default_camera_path}.")
+parser.add_argument("--output_name", dest="output_name", type=str, default=default_output_name, help=f"Name of the output. \nDefault: {default_output_name}.")
 parser.add_argument("--output_path", dest="output_path", type=Path, default=default_output_path, help=f"Path to save the output. \nDefault: {default_output_path}.")
 parser.add_argument("--output_format", dest="output_format", type=str, default=default_output_format, help=f"Output format. \nDefault: {default_output_format}.")
 parser.add_argument("--interpolation_steps", dest="interpolation_steps", type=int, default=default_interpolation_steps, help=f"Number of interpolation steps. \nDefault: {default_interpolation_steps}.")
