@@ -49,7 +49,9 @@ To use:
 IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
 
 Example usage:
-python PATH/TO/THIS/SCRIPT/camera_poses_to_images.py --config_path PATH/TO/CONFIG/FILE --camera_path PATH/TO/CAMERA/PATH/FILE | tee console.txt
+python PATH/TO/THIS/SCRIPT/camera_poses_to_images.py --config_path PATH/TO/CONFIG/FILE --camera_path PATH/TO/CAMERA/PATH/FILE 
+* NOTE: verbose is default set true, so that the process can be seen in the terminal.
+* use | tee console.txt if you want to save terminal output to a file
 
 """
 
@@ -92,11 +94,11 @@ class TeeOutput:
 #ARGUMENTS:
 
 #default values
-default_verbose = False
+default_verbose = True
 default_base_path = Path("./")
 default_mode = "camera-path"
-default_config_path = Path("./processed/processed/nerfacto/config.yml") #REQUIRED
-default_camera_path = Path("./processed/processed/nerfacto/camera_path.json")
+default_config_path = Path(f"./processed/processed/{default_mode}/config.yml") #REQUIRED
+default_camera_path = Path("./processed/processed/camera_paths/camera_path.json") #REQUIRED if mode is camera_path
 default_output_name = "output"
 default_output_path = Path(f'./renders/{default_mode}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}/{default_output_name}')
 default_output_format = "images"
@@ -111,7 +113,7 @@ parser = argparse.ArgumentParser(description=help_text, formatter_class=argparse
 
 
 #parser arguments
-parser.add_argument("--verbose", dest="verbose", default=default_verbose, help=f"Print verbose output. \nDefault: {default_verbose}.", action="store_true")
+parser.add_argument("--verbose", dest="verbose", default=default_verbose, help=f"Print verbose output. \nDefault: {default_verbose}.", action="store_false")
 parser.add_argument("--base_path", dest="base_path", type=Path, default=Path(default_base_path), help=f"Path to the project directory. \nDefault: {default_base_path}.")
 parser.add_argument("--mode", dest="mode", type=str, default=default_mode, help=f"Mode of rendering. \nDefault: {default_mode}.")
 parser.add_argument("--config_path", dest="config_path", type=Path, default=default_config_path, help=f"Path to the config file. \n REQUIRED: NO DEFAULT.")
@@ -216,15 +218,13 @@ elif mode == "interpolate":
 else:
     raise ValueError(f"Invalid mode: {mode}")
 
-print(" ".join(render_cmd))
+render_cmd = " ".join(render_cmd)
+print(render_cmd)
 start_time = time.time()
-process = subprocess.Popen(render_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-for line in process.stdout:
-    print(line, end="")
-process.wait()
-if process.returncode != 0:
-    error_output = process.stderr.read()
-    print(f"Error: {error_output}")
+
+with status(msg="[bold yellow]Rendering... \n", spinner="moon", verbose=verbose):
+    run_command(render_cmd, verbose=verbose)
+    
 time_render = time_taken(start_time)    
 CONSOLE.log(f"[bold green]:tada: Rendering completed in {time_render}.","\n",
             f"[bold white]Output saved at: {output_path}.")
@@ -234,4 +234,4 @@ CONSOLE.log(f"[bold green]:tada: Rendering completed in {time_render}.","\n",
 #FINISH SCRIPT
 CONSOLE.log("[bold green]\n:tada: NeRFstudio Rendering Complete.")
 
-#END OF SCRIPT:
+#END OF SCRIPT
