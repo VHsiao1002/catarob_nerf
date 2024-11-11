@@ -61,7 +61,9 @@ To use:
 IF this script is not in the project directory, specify the path to the project directory using the --base_path argument.
 
 Example usage:
-python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py --base_path /PATH/TO/PROJECT/DIRECTORY | tee console.txt
+python /PATH/TO/THIS/SCRIPT/glomap_nerf_process.py --base_path /PATH/TO/PROJECT/DIRECTORY
+* NOTE: verbose is default set true, so that the process can be seen in the terminal. 
+* use | tee console.txt if you want to save terminal output to a file
 
 """
     
@@ -140,10 +142,11 @@ class TeeOutput:
 #ARGUMENTS:
 
 #default values
-default_verbose = False
+default_verbose = True
 default_base_path = Path("./")
 default_image_path = Path(f"{default_base_path /'images'}")
 default_database_path = Path(f"{default_base_path / 'database.db'}")
+default_no_glomap = False
 default_camera_model = "OPENCV"
 default_camera_params = '529.4046769303875,529.6521348953188,647.1984132364281,354.6428014457265,0.007903972094598234,-0.002969179169396172,6.960621857680132e-05,-0.0012077776793605057' #default camera parameters for the blackfly camera
 default_matching_method = "sequential"
@@ -152,6 +155,7 @@ default_sparse_path = Path(f"{default_base_path / 'sparse'}")
 default_nerf_method = "nerfacto"
 default_depth_path = Path(f"{default_base_path / 'depth'}")
 default_downscale_factor = 1
+default_check_cuda = False
 default_skip_extractor = False
 default_skip_matcher = False
 default_skip_mapper = False
@@ -168,10 +172,11 @@ parser = argparse.ArgumentParser(description=help_text, formatter_class=argparse
 
 
 #parser arguments
-parser.add_argument("--verbose", dest="verbose", default=default_verbose, help=f"Print verbose output. \nDefault: {default_verbose}.", action="store_true")
+parser.add_argument("--verbose", dest="verbose", default=default_verbose, help=f"Print verbose output. \nDefault: {default_verbose}.", action="store_false")
 parser.add_argument("--base_path", dest="base_path", type=Path, default=Path(default_base_path), help=f"Path to the project directory. \nDefault: {default_base_path}.")
 parser.add_argument("--image_path", dest="image_path", type=Path, default=Path(default_image_path), help=f"Path to the images. \nDefault: {default_image_path}.")
 parser.add_argument("--database_path",dest="database_path",  type=Path, default=Path(default_database_path), help=f"Path to the database (including /database.db). \nDefault: {default_database_path}.")
+parser.add_argument("--no_glomap", dest="no_glomap", default=default_no_glomap, help=f"Use GLOMAP for mapping. \nDefault: {default_no_glomap}", action="store_true")
 parser.add_argument("--camera_model",dest="camera_model",  type=str, default=default_camera_model, help=f"Camera model (PINHOLE | OPENCV | RADIAL | SIMPLE_RADIAL | FISHEYE | SIMPLE_RADIAL_FISHEYE | OPENCV_FISHEYE). \nDefault: {default_camera_model}.")
 parser.add_argument("--camera_params",dest="camera_params",  type=str, default=default_camera_params, help=f"Camera parameters (fx,fy,cx,cy,k1,k2,p1,p2). \nDefault: {default_camera_params}.")
 parser.add_argument("--matching_method",dest="matching_method",  type=str, default=default_matching_method, help=f"COLMAP feature matcher method (exhaustive | sequential | vocab_tree ). \nDefault: {default_matching_method}.")
@@ -180,6 +185,7 @@ parser.add_argument("--sparse_path", dest="sparse_path", type=Path, default=Path
 parser.add_argument("--nerf_method", dest="nerf_method", type=str, default=default_nerf_method, help=f"NeRF method to train (nerfacto | depth-nerfacto | instant-ngp | splatfacto). \nDefault: {default_nerf_method}.")
 parser.add_argument("--depth_path", dest="depth_path", type=Path, default=Path(default_depth_path), help=f"Path to the depth images. \nDefault: {default_depth_path}.")
 parser.add_argument("--downscale_factor", dest="downscale_factor", type=int, default=default_downscale_factor, help=f"Downscale factor for depth-nerfacto method. \nDefault: {default_downscale_factor}.")
+parser.add_argument("--check_cuda", dest="check_cuda", default=default_check_cuda, help=f"Check CUDA installation. \nDefault: {default_check_cuda}", action="store_true")
 parser.add_argument("--skip_extractor", dest="skip_extractor", default=default_skip_extractor, help=f"Skip feature extractor. \nDefault: {default_skip_extractor}", action="store_true")
 parser.add_argument("--skip_matcher", dest="skip_matcher", default=default_skip_matcher, help=f"Skip feature matcher. \nDefault: {default_skip_matcher}", action="store_true")
 parser.add_argument("--skip_mapper", dest="skip_mapper", default=default_skip_mapper, help=f"Skip glomap mapper. \nDefault: {default_skip_mapper}", action="store_true")
@@ -198,6 +204,7 @@ verbose = args.verbose
 base_path = Path(args.base_path)
 image_path = Path(args.image_path) if args.image_path != default_image_path else Path(f"{base_path / 'images'}")
 database_path = Path(args.database_path) if args.database_path != default_database_path else Path(f"{base_path / 'database.db'}")
+no_glomap = args.no_glomap
 camera_model = args.camera_model
 camera_params = args.camera_params
 matching_method = args.matching_method
@@ -206,6 +213,7 @@ sparse_path = Path(args.sparse_path) if args.sparse_path != default_sparse_path 
 nerf_method = args.nerf_method
 depth_path = Path(args.depth_path) if args.depth_path != default_depth_path else Path(f"{base_path / 'depth'}")
 downscale_factor = args.downscale_factor
+check_cuda = args.check_cuda
 skip_extractor = args.skip_extractor
 skip_matcher = args.skip_matcher
 skip_mapper = args.skip_mapper
@@ -236,6 +244,21 @@ train_args = shlex.split(args.train_args) if args.train_args else []
 #CHECKS:
 
 CONSOLE.log("[bold white]Checking dependencies...")
+
+#check CUDA installation (nvcc, available CUDA devices and CUDA device count) #but do not raise error if not installed
+if (check_cuda):
+    with status(msg="[bold yellow]Checking CUDA installation...", spinner="moon"):
+        try:
+            run_command("nvcc --version", verbose=verbose)
+            run_command("nvidia-smi", verbose=verbose)
+            import torch
+            print(torch.cuda.is_available())
+            print(torch.cuda.device_count())
+            print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A")
+        except FileNotFoundError:
+            raise Exception("CUDA is not installed properly. Some features may not work.")
+        else:
+            CONSOLE.log("[bold green]CUDA is installed correctly.")
 
 #check if colmap is installed
 with status(msg="[bold yellow]Checking COLMAP installation...", spinner="moon"):
@@ -304,7 +327,7 @@ if not skip_extractor:
 
     #run feature extractor command 
     start_time = time.time()
-    with status(msg="[bold yellow]Running COLMAP feature extractor...", spinner="runner"):
+    with status(msg="[bold yellow]Running COLMAP feature extractor... \n", spinner="runner"):
         run_command(feature_extractor_cmd, verbose=verbose)
     time_feature_extractor = time_taken(start_time)
     CONSOLE.log(f"[bold green]:tada: Done extracting COLMAP features. ({time_feature_extractor})")
@@ -328,7 +351,7 @@ if not skip_matcher:
 
     #run feature matcher command
     start_time = time.time()
-    with status(msg="[bold yellow]Running COLMAP feature matcher...", spinner="runner", verbose=verbose):
+    with status(msg="[bold yellow]Running COLMAP feature matcher... \n", spinner="runner", verbose=verbose):
         run_command(feature_matcher_cmd, verbose=verbose)
     time_feature_matcher = time_taken(start_time)
     CONSOLE.log(f"[bold green]:tada: Done matching COLMAP features. ({time_feature_matcher})")
@@ -336,9 +359,12 @@ else:
     CONSOLE.log("[bold yellow]Skipping feature matcher.")
 
 #================================================================================================================================================================
-#GLOMAP MAPPER
+#MAPPER
 
 sparse_path.mkdir(parents=True, exist_ok=True)
+
+if no_glomap:
+    glomap_cmd = "colmap"
 
 if not skip_mapper:
     glomap_mapper_cmd = [
@@ -352,7 +378,7 @@ if not skip_mapper:
 
     #run glomap mapper command
     start_time = time.time()
-    with status(msg="[bold yellow]Running GLOMAP mapper... (This may take a while)", spinner="runner", verbose=verbose):
+    with status(msg="[bold yellow]Running GLOMAP mapper... (This may take a while) \n", spinner="runner", verbose=verbose):
         run_command(glomap_mapper_cmd, verbose=verbose)
     time_glomap_mapper = time_taken(start_time)
     CONSOLE.log(f"[bold green]:tada: Done mapping images with GLOMAP. ({time_glomap_mapper})","\n",
@@ -380,7 +406,7 @@ if not skip_process_data:
 
     #run ns-process-data command
     start_time = time.time()
-    with status(msg="[bold yellow]Running NeRFstudio process data...", spinner="runner", verbose=verbose):
+    with status(msg="[bold yellow]Running NeRFstudio process data... \n", spinner="runner", verbose=verbose):
         run_command(ns_process_data_cmd, verbose=verbose)
     time_ns_process_data = time_taken(start_time)
     CONSOLE.log(f"[bold green]:tada: Done processing data for NeRFstudio. ({time_ns_process_data})")
@@ -410,19 +436,29 @@ if(not skip_train):
             "--data", str(processed_path),
             "--output-dir", str(processed_path),
         ]) #+train_args   
+        
     if train_args:
         ns_train_cmd.extend(train_args)
-    print(ns_train_cmd)
         
+    ns_train_cmd = " ".join(ns_train_cmd)
+    print(ns_train_cmd)
+                     
+         
     #run ns-train command
     start_time = time.time()
-    process = subprocess.Popen(ns_train_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    for line in process.stdout:
-        print(line, end="")
-    process.wait()
-    if process.returncode != 0:
-        error_output = process.stderr.read()
-        print(f"Error: {error_output}")
+    
+    # print(" ".join(ns_train_cmd))
+    # process = subprocess.Popen(ns_train_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    # for line in process.stdout:
+    #     print(line, end="")
+    # process.wait()
+    # if process.returncode != 0:
+    #     error_output = process.stderr.read()
+    #     print(f"Error: {error_output}")
+    
+    with status(msg="[bold yellow]Running NeRFstudio train... \n", spinner="runner", verbose=verbose):
+        run_command(ns_train_cmd, verbose=verbose)
+        
     time_ns_train = time_taken(start_time)
     CONSOLE.log(f"[bold green]:tada: Done {nerf_method} training. ({time_ns_train})","\n",
                 f"[bold white]The config is saved at {base_path}/. Use ns-viewer --load-config path/to/config.yml to view the results ({processed_path}).")
