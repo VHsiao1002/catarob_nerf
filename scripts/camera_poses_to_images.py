@@ -104,6 +104,7 @@ default_output_path = Path(f'./renders/{default_mode}/{datetime.now().strftime("
 default_output_format = "images"
 default_interpolation_steps = 10
 default_frame_rate = 24
+default_split = "train"
 default_occlusions = False
 default_extra_args = ""
 
@@ -123,6 +124,7 @@ parser.add_argument("--output_path", dest="output_path", type=Path, default=defa
 parser.add_argument("--output_format", dest="output_format", type=str, default=default_output_format, help=f"Output format. \nDefault: {default_output_format}.")
 parser.add_argument("--interpolation_steps", dest="interpolation_steps", type=int, default=default_interpolation_steps, help=f"Number of interpolation steps. \nDefault: {default_interpolation_steps}.")
 parser.add_argument("--frame_rate", dest="frame_rate", type=int, default=default_frame_rate, help=f"Frame rate of the output video. \nDefault: {default_frame_rate}.")
+parser.add_argument("--split", dest="split", type=str, default=default_split, help=f"Split of the dataset. \nDefault: {default_split}.")
 parser.add_argument("--occlusions", dest="occlusions", default=default_occlusions, help=f"Check occlusions. \nDefault: {default_occlusions}.", action="store_true")
 parser.add_argument("--extra_args", dest="extra_args", type=str, default=default_extra_args, help="Additional arguments for the ns-render command.")
 
@@ -139,21 +141,9 @@ output_path = Path(args.output_path) if args.output_path != default_output_path 
 output_format = args.output_format
 interpolation_steps = args.interpolation_steps
 frame_rate = args.frame_rate
+split = args.split
 occlusions = args.occlusions
 extra_args = shlex.split(args.extra_args) if args.extra_args else []
-
-
-#================================================================================================================================================================
-#MAIN SCRIPT:
-
-#console file name is current date and time
-# console_folder = base_path / 'console'
-# console_folder.mkdir(parents=True, exist_ok=True)
-# console_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + "_console.txt"
-# console_path = console_folder / console_filename
-#use '| tee console.txt' to save console output to a file
-#uncomment TeeOutput and tab in script to save console output to a file
-# with TeeOutput(console_path):
 
 #================================================================================================================================================================
 #START OF SCRIPT:
@@ -210,11 +200,14 @@ elif mode == "interpolate":
         "--frame-rate", str(frame_rate),
         "--check-occlusions", str(occlusions),
     ] +extra_args
-# elif mode == "dataset":
-#     render_cmd = [
-#         str(ns_cmd), str(mode),
-#         "--load-config", str(config_path), 
-#     ] +extra_args
+elif mode == "dataset":
+    render_cmd = [
+        str(ns_cmd), str(mode),
+        "--load-config", str(config_path), 
+        "--output-path", str(output_path),
+        "--split", str(split),
+        "--check-occlusions", str(occlusions),
+    ] +extra_args
 else:
     raise ValueError(f"Invalid mode: {mode}")
 
