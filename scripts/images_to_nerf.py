@@ -408,7 +408,7 @@ else:
 #NERFSTUDIO TRAIN
 
 processed_path = base_path / "processed"
-print("nerf_method",nerf_method)
+# print("nerf_method",nerf_method)
 
 if(not skip_train):
     ns_train_cmd = ["ns-train", nerf_method]

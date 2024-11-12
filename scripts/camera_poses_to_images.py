@@ -136,7 +136,7 @@ base_path = Path(args.base_path)
 mode = args.mode
 config_path = Path(args.config_path)
 camera_path = Path(args.camera_path)
-output_name = args.output_name
+output_name = args.output_name if args.output_name != default_output_name else f"{config_path.stem}_output"
 output_path = Path(args.output_path) if args.output_path != default_output_path else Path(f'./renders/{default_mode}/{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}/{output_name}')
 output_format = args.output_format
 interpolation_steps = args.interpolation_steps
