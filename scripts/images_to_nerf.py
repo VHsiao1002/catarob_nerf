@@ -408,6 +408,7 @@ else:
 #NERFSTUDIO TRAIN
 
 processed_path = base_path / "processed"
+print("nerf_method",nerf_method)
 
 if(not skip_train):
     ns_train_cmd = ["ns-train", nerf_method]
@@ -422,6 +423,11 @@ if(not skip_train):
             "--output-dir", str(processed_path),
             "--pipeline.model.camera-optimizer.mode", str(camera_optimizer),
         ])
+    if nerf_method == "splatfacto":
+        ns_train_cmd.extend([
+            "--data", str(processed_path),
+            "--output-dir", str(processed_path),
+        ])
     else:
         ns_train_cmd.extend([
             "--data", str(processed_path),
@@ -434,6 +440,8 @@ if(not skip_train):
         
     ns_train_cmd = " ".join(ns_train_cmd)
     print(ns_train_cmd)
+    
+    # print( " ".join(ns_train_cmd))
                      
          
     #run ns-train command
