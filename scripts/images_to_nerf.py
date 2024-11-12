@@ -426,7 +426,7 @@ if(not skip_train):
         ns_train_cmd.extend([
             "--data", str(processed_path),
             "--output-dir", str(processed_path),
-            "--pipeline.model.camera-optimizer.mode off", str(camera_optimizer),
+            "--pipeline.model.camera-optimizer.mode", str(camera_optimizer),
         ])  
         
     if train_args:
